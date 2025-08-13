@@ -1,0 +1,1 @@
+1 - fazer framework de treinamento, não criar rede customizada agora, testar primeiro na resnet18, que demora menos pra treinar

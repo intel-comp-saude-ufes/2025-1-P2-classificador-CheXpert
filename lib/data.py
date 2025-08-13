@@ -2,7 +2,6 @@ import kagglehub
 import pandas as pd
 import os
 from PIL import Image
-import matplotlib.pyplot as plt
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -19,10 +18,12 @@ class CheXpertDataSet(Dataset):
         self.meta_data = data_df[meta_columns].to_numpy()
         self.label_data = data_df[label_columns].to_numpy()
         
-        self.transformation=transformation
+        self.transformation=transformation        
         return 
+    
     def __len__(self):
-        return self.data_df.shape[0]
+        return len(self.path_series)
+    
     def __getitem__(self, index):
         img = Image.open(self.path_series[index])
         if self.transformation:
@@ -31,10 +32,14 @@ class CheXpertDataSet(Dataset):
         y = self.label_data[index]        
         metadata = self.meta_data[index]
         return metadata, y, img
+    
+    def to_dataloader(self, batch_size=64, shuffle=False):
+        dataset = self
+        return DataLoader(dataset=dataset, batch_size=batch_size, shuffle=shuffle)
 
 
-## PATH = '/home/msmartin/.cache/kagglehub/datasets/ashery/chexpert/versions/1'
-
+## path = '/home/msmartin/.cache/kagglehub/datasets/ashery/chexpert/versions/1' (linux)
+## path = 'C:\\Users\\matheus\\.cache\\kagglehub\\datasets\\ashery\\chexpert\\versions\\1' (windows)
 
 def get_transformations(img_size = (224, 224)):
     
@@ -106,12 +111,16 @@ def encode_categoric_column(df: pd.DataFrame, c_name: str, data_dict):
     data_dict[c_name] = {'label2id' : label2id, 'idtolabel' : id2label}
     return
 
+def filter_frontal_images(df:pd.DataFrame, position_column):
+    mask = df[position_column] == 'Frontal'
+    df = df[mask]
+    return df
 
-## TODO: remover as instâncias do dataset que não são Frontal/Lateral == Frontal (Tem 90% de imagens frontais e 10% de laterais, são problemas diferentes)
-## e está desbalanceado
-def read_data():
-    import kagglehub
-    path = kagglehub.dataset_download("ashery/chexpert")
+
+def get_data() -> dict:
+    #path = kagglehub.dataset_download("ashery/chexpert")
+    path = 'C:\\Users\\matheus\\.cache\\kagglehub\\datasets\\ashery\\chexpert\\versions\\1'
+    #path = '/home/msmartin/.cache/kagglehub/datasets/ashery/chexpert/versions/1'
     
     data_dict = dict()
     
@@ -122,30 +131,44 @@ def read_data():
     df_train = pd.read_csv(train_csv_path)    
     df_valid = pd.read_csv(valid_csv_path)
     
-    metadata_columns = ['Sex', 'Age', 'Frontal/Lateral', 'AP/PA']
+    ## remove 'Frontal/Lateral' column after filter just the Frontal Images
+    pos_col = 'Frontal/Lateral'
+    frontal_str = 'Frontal'
+    df_train = df_train[df_train[pos_col] == frontal_str]
+    df_valid = df_valid[df_valid[pos_col] == frontal_str]
+    
+    df_train = df_train.drop(labels=[pos_col], axis=1)
+    df_valid = df_valid.drop(labels=[pos_col], axis=1)
+    
+    metadata_columns = ['Sex', 'Age', 'AP/PA']
     path_column = 'Path'
     label_columns = [c for c in df_train.columns if c not in (metadata_columns + [path_column])]
     
-    print(metadata_columns, len(metadata_columns))
-    print(path_column, len(path_column))
-    print(label_columns, len(label_columns))
-    
-    return 
-    
-    ## metadata_columns : Sex, Age, Frontal/Lateral, AP/PA
-    categoric_columns = ['Sex', 'Frontal/Lateral', 'AP/PA']
+    ## metadata_columns : Sex, Age, AP/PA
+    categoric_columns = ['Sex', 'AP/PA']
     print(df_train.iloc[0:10][categoric_columns])    
     for c in categoric_columns:
         encode_categoric_column(df_train, c, data_dict)
         df_train[c] = df_train[c].replace(data_dict[c]['label2id'])
-        
-    ## there is no Path or Age with nan value both in train and valid dataframes !!!
-    print(df_train.iloc[0:10][categoric_columns])    
-    
+
+    ## fixing paths 
     df_train['Path'] = fix_df_path(df_train, path)
     df_valid['Path'] = fix_df_path(df_valid, path)
     
+    ## setting nan -> 0, and -1 -> 0, for all label_columns
     df_train = treat_df_label_columns(df_train, label_columns, inplace=True)
     df_valid = treat_df_label_columns(df_valid, label_columns, inplace=True)
     
+    df_train = df_train.reset_index(drop=True) # this is needed, do not remove this reset index lines (DataSet stores pandas Series, so they must have the correct indexes)
+    df_valid = df_valid.reset_index(drop=True)
+    
+    ## there is no Path or Age with nan value both in train and valid dataframes !!!
+    
+    train_dataset = CheXpertDataSet(df_train, label_columns, metadata_columns, path_column, transformation=train_transformation)
+    test_dataset = CheXpertDataSet(df_valid, label_columns, metadata_columns, path_column, transformation=test_transformation)
+    
+    data_dict['train_dataset'] = train_dataset
+    data_dict['test_dataset'] = test_dataset
+    
+    return data_dict
     
