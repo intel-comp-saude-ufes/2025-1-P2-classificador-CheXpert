@@ -1,7 +1,9 @@
 
 from lib.data import get_data, prepare_img_tensor
-from lib.utils import show_batch
-import matplotlib.pyplot as plt
+from lib.models import MyResnet18
+from lib.training import train
+from torch import nn
+import torch
 
 def print_data_dict(d : dict):
     line_str = '-'*100
@@ -13,16 +15,17 @@ def print_data_dict(d : dict):
 if __name__ == '__main__':
     
     data_dict = get_data()
+    train_dataset, test_dataset = data_dict['train_dataset'], data_dict['test_dataset']    
 
-    train_dataset, test_dataset = data_dict['train_dataset'], data_dict['test_dataset']
+    print(len(data_dict['classes']))
     
-    train_dataloader, test_dataloader = train_dataset.to_dataloader(batch_size=16, shuffle=True), test_dataset.to_dataloader(batch_size=16, shuffle=True)
+    n_classes = len(data_dict['classes'])
+    model= MyResnet18(n_classes=n_classes)
     
-    '''
-    de acordo com esse print, parece que as imagens estão ok
-    X, y, img = next(iter(train_dataloader))
-    for img_t in img:
-        img_t = prepare_img_tensor(img_t, [0.5]*3, [0.5]*3)
-        plt.imshow(img_t)
-        plt.show()
-    '''
+    model.unfreeze()
+    loss_fn= nn.BCEWithLogitsLoss(reduction='mean')
+    optimizer= torch.optim.Adam(model.parameters(), lr=0.001)
+    
+    
+    train(model, train_dataset, test_dataset,
+          loss_fn, optimizer, save_path='./', device=torch.device('cpu'), verbose=True)

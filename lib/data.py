@@ -31,7 +31,7 @@ class CheXpertDataSet(Dataset):
             
         y = self.label_data[index]        
         metadata = self.meta_data[index]
-        return metadata, y, img
+        return img, y
     
     def to_dataloader(self, batch_size=64, shuffle=False):
         dataset = self
@@ -116,10 +116,15 @@ def filter_frontal_images(df:pd.DataFrame, position_column):
     df = df[mask]
     return df
 
+def filter_data_frame(df:pd.DataFrame, size=0.1):
+    final_size = int(df.shape[0]*size)
+    df = df.iloc[:final_size]
+    return df
+
 
 def get_data() -> dict:
-    #path = kagglehub.dataset_download("ashery/chexpert")
-    path = 'C:\\Users\\matheus\\.cache\\kagglehub\\datasets\\ashery\\chexpert\\versions\\1'
+    path = kagglehub.dataset_download("ashery/chexpert")
+    #path = 'C:\\Users\\matheus\\.cache\\kagglehub\\datasets\\ashery\\chexpert\\versions\\1'
     #path = '/home/msmartin/.cache/kagglehub/datasets/ashery/chexpert/versions/1'
     
     data_dict = dict()
@@ -145,8 +150,7 @@ def get_data() -> dict:
     label_columns = [c for c in df_train.columns if c not in (metadata_columns + [path_column])]
     
     ## metadata_columns : Sex, Age, AP/PA
-    categoric_columns = ['Sex', 'AP/PA']
-    print(df_train.iloc[0:10][categoric_columns])    
+    categoric_columns = ['Sex', 'AP/PA'] 
     for c in categoric_columns:
         encode_categoric_column(df_train, c, data_dict)
         df_train[c] = df_train[c].replace(data_dict[c]['label2id'])
@@ -159,6 +163,9 @@ def get_data() -> dict:
     df_train = treat_df_label_columns(df_train, label_columns, inplace=True)
     df_valid = treat_df_label_columns(df_valid, label_columns, inplace=True)
     
+    df_train = filter_data_frame(df_train, size=0.05) ## filtrando pra testar
+    print('lines:',df_train.shape[0])
+    
     df_train = df_train.reset_index(drop=True) # this is needed, do not remove this reset index lines (DataSet stores pandas Series, so they must have the correct indexes)
     df_valid = df_valid.reset_index(drop=True)
     
@@ -169,6 +176,7 @@ def get_data() -> dict:
     
     data_dict['train_dataset'] = train_dataset
     data_dict['test_dataset'] = test_dataset
+    data_dict['classes'] = label_columns
     
     return data_dict
     
