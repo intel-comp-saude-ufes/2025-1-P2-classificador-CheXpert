@@ -1,5 +1,11 @@
 
 
+def get_device():
+    import torch
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'    
+    return torch.device(device=device)
+
+
 def show_batch(title: str, images, labels, label_map: dict, device=None, net=None, path=None, grad_cam=False, target_layer=None):
     '''
     Plota um batch. Se o modelo não for None, calcula as predições e plota junto. Se path não for None, salva a imagem em path como png. 

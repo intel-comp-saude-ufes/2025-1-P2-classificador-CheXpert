@@ -6,7 +6,8 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms import v2
-
+from torchvision.datasets import ImageFolder
+from torch.utils.data import Subset, random_split
 
 class CheXpertDataSet(Dataset):
     def __init__(self, data_df, label_columns, meta_columns, path_column, transformation=None):
@@ -179,4 +180,63 @@ def get_data() -> dict:
     data_dict['classes'] = label_columns
     
     return data_dict
+
+
+#---------------------------------------------------------
+
+class TransformDataset(Dataset):
+    def __init__(self, subset, transform):
+        self.subset = subset
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.subset)
+
+    def __getitem__(self, idx):
+        img, label = self.subset[idx]
+        if self.transform:
+            img = self.transform(img)
+        return img, label
+
+
+def my_random_split(dataset: ImageFolder, size=float) -> tuple[Subset, Subset]:
+    '''
+    random test split que utiliza o do pytorch como auxiliar, devolve subsets (referências) de dataset maior, não há redundancia de dados.
+    '''
     
+    train_size = int((size) * len(dataset))
+    val_size = len(dataset) - train_size
+    train_subset, val_subset = random_split(dataset, [train_size, val_size])
+    
+    return (train_subset, val_subset)
+
+
+## https://www.kaggle.com/datasets/alsaniipe/chest-x-ray-image
+def get_data_chest_x_ray_image():
+    '''
+    le os dados do kaggle e retorna um dicionário contendo todos so datasets já com transformações definidas, além de outros metadados
+    '''
+    PATH = kagglehub.dataset_download("alsaniipe/chest-x-ray-image")    
+    train_path = os.path.join(PATH, 'Data/train')
+    test_path = os.path.join(PATH, 'Data/test')
+
+    base_train_dataset = ImageFolder(root=train_path)
+    train_subset, val_subset = my_random_split(base_train_dataset, size=0.8)
+
+    train_transform, test_transform = get_transformations(img_size=(224, 224))
+    
+    ## validação e teste recebem o mesmo transformador
+    train_dataset = TransformDataset(train_subset, train_transform)
+    val_dataset = TransformDataset(val_subset, test_transform)
+    test_dataset = ImageFolder(root=test_path, transform=test_transform)
+
+    data = {
+        'train_dataset': train_dataset,
+        'val_dataset' : val_dataset,
+        'test_dataset': test_dataset,
+        'idx_to_class': {v: k for k, v in base_train_dataset.class_to_idx.items()},
+        'class_to_idx': base_train_dataset.class_to_idx,
+        'classes': base_train_dataset.classes,
+    }
+    
+    return data

@@ -1,8 +1,9 @@
 
-from lib.data import get_data, prepare_img_tensor
-from lib.models import MyResnet18
+from lib.data import get_data, get_data_chest_x_ray_image
 from lib.training import train
-from torch import nn
+from lib.metrics import MetricCollection
+from lib.utils import get_device
+from lib.models import MyResnet18
 import torch
 
 def print_data_dict(d : dict):
@@ -14,18 +15,19 @@ def print_data_dict(d : dict):
 
 if __name__ == '__main__':
     
-    data_dict = get_data()
-    train_dataset, test_dataset = data_dict['train_dataset'], data_dict['test_dataset']    
 
-    print(len(data_dict['classes']))
+    chest_x_ray_dict = get_data_chest_x_ray_image()
     
-    n_classes = len(data_dict['classes'])
-    model= MyResnet18(n_classes=n_classes)
+    train_dataset, val_dataset, test_dataset = chest_x_ray_dict['train_dataset'], chest_x_ray_dict['val_dataset'], chest_x_ray_dict['test_dataset']
+    
+    device = get_device()
+    n_classes = len(chest_x_ray_dict['classes'])
+    metric_collection = MetricCollection(device=device, num_classes=n_classes, task_type='multiclass')
+    
+    model = MyResnet18(n_classes=n_classes)    
+    loss_fn = torch.nn.CrossEntropyLoss(reduction='mean')
+    optimizer = torch.optim.Adam()
     
     model.unfreeze()
-    loss_fn= nn.BCEWithLogitsLoss(reduction='mean')
-    optimizer= torch.optim.Adam(model.parameters(), lr=0.001)
     
-    
-    train(model, train_dataset, test_dataset,
-          loss_fn, optimizer, save_path='./', device=torch.device('cpu'), verbose=True)
+    train(model, train_dataset, val_dataset)

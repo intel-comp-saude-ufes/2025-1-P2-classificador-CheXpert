@@ -4,6 +4,107 @@ import os
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from torchmetrics.classification import MultilabelF1Score
+import torchmetrics
+
+import torch
+import torchmetrics
+
+import torch
+import torchmetrics
+
+import torch
+import torchmetrics
+
+import torch
+import torchmetrics
+
+class MetricCollection:
+    def __init__(self, device, task_type: str, threshold: float = 0.5):
+        self.device = device
+        self.task_type = task_type
+        self.threshold = threshold
+        self.metrics = {}
+        self.num_classes = None
+        self.configured = False
+
+    def _configure(self, logits):
+        if self.task_type == "binary":
+            self.num_classes = 2
+            self.metrics = {
+                "accuracy": torchmetrics.Accuracy(task="binary").to(self.device),
+                "precision": torchmetrics.Precision(task="binary").to(self.device),
+                "recall": torchmetrics.Recall(task="binary").to(self.device),
+                "f1": torchmetrics.F1Score(task="binary").to(self.device),
+            }
+        elif self.task_type == "multiclass":
+            self.num_classes = logits.shape[1]
+            self.metrics = {
+                "accuracy": torchmetrics.Accuracy(task="multiclass", num_classes=self.num_classes).to(self.device),
+                "precision": torchmetrics.Precision(task="multiclass", num_classes=self.num_classes, average="macro").to(self.device),
+                "recall": torchmetrics.Recall(task="multiclass", num_classes=self.num_classes, average="macro").to(self.device),
+                "f1": torchmetrics.F1Score(task="multiclass", num_classes=self.num_classes, average="macro").to(self.device),
+            }
+        elif self.task_type == "multilabel":
+            self.num_classes = logits.shape[1]
+            self.metrics = {
+                "accuracy": torchmetrics.Accuracy(task="multilabel", num_labels=self.num_classes).to(self.device),
+                "precision": torchmetrics.Precision(task="multilabel", num_labels=self.num_classes, average="macro").to(self.device),
+                "recall": torchmetrics.Recall(task="multilabel", num_labels=self.num_classes, average="macro").to(self.device),
+                "f1": torchmetrics.F1Score(task="multilabel", num_labels=self.num_classes, average="macro").to(self.device),
+            }
+        else:
+            raise ValueError(f"Tarefa inválida: {self.task_type}")
+
+        self.configured = True
+
+    def _logits_to_preds(self, logits):
+        if self.task_type == "binary":
+            probs = torch.sigmoid(logits)
+            return (probs >= self.threshold).long().squeeze()
+        elif self.task_type == "multiclass":
+            return torch.argmax(logits, dim=1)
+        elif self.task_type == "multilabel":
+            probs = torch.sigmoid(logits)
+            return (probs >= self.threshold).long()
+        else:
+            raise ValueError("Tarefa inválida.")
+
+    def update(self, logits, targets):
+        if not self.configured:
+            self._configure(logits)
+        preds = self._logits_to_preds(logits)
+        for metric in self.metrics.values():
+            metric.update(preds, targets)
+
+    def compute(self):
+        return {name: metric.compute().item() for name, metric in self.metrics.items()}
+
+    def reset(self):
+        for metric in self.metrics.values():
+            metric.reset()
+
+
+class EarlyStopping:
+        def __init__(self, patience=10, min_delta=0.0):
+            self.patience = patience
+            self.min_delta = min_delta
+            self.best_score = float('inf')
+            self.counter = 0
+            self.best_flag = False
+
+        def step(self, current_loss: float) -> bool:
+            if current_loss < self.best_score - self.min_delta:
+                self.best_score = current_loss
+                self.counter = 0
+                self.best_flag = True
+                return False 
+            else:
+                self.counter += 1
+                self.best_flag = False
+                return self.counter >= self.patience
+
+        def is_best(self) -> bool:
+            return self.best_flag
 
 
 def save_my_checkpoint(model:torch.nn.Module, optimizer, loss_fn, min_val_loss:float, epoch : int, history: dict, path : str, is_best:bool=False):
@@ -70,13 +171,13 @@ def eval(model:torch.nn.Module, eval_dataset:torch.utils.data.Dataset, device:to
     return (y_true, y_pred)
 
 
-def one_epoch(model: torch.nn.Module, dataloader: torch.utils.data.DataLoader, optimizer, loss_fn, device: torch.device, is_eval:bool=False):
+def one_epoch(model: torch.nn.Module, dataloader: torch.utils.data.DataLoader, optimizer, loss_fn, device: torch.device, is_eval:bool=False, metric_obj = None):
     '''
     Executa uma época, se is_eval=True, não calcula os gradientes e coloca o modelo em modo de avaliação.
     '''
     #y_true = []
     #y_pred = []
-    f1_metric_obj = MultilabelF1Score(num_labels=14, average="micro").to('cpu')
+    
     loss_acc = 0.0
 
     if is_eval:
@@ -85,22 +186,19 @@ def one_epoch(model: torch.nn.Module, dataloader: torch.utils.data.DataLoader, o
     else:
         model.train()
         context = torch.enable_grad()
-    i = 0
+
     with context:
         for X, y in dataloader:
             X, y = X.to(device), y.to(device)
             logits = model(X)
-
-            #preds = torch.argmax(logits, dim=1)
-            #y_pred.extend(preds.cpu().numpy())
-            #y_true.extend(y.cpu().numpy())
-            
+    
             probs = torch.sigmoid(logits)
             preds = (probs >= 0.5).float()
             
-            f1_metric_obj.update(preds, y)
-            f1_score = f1_metric_obj.compute().item()
-
+            if metric_obj is not None:
+                metric_obj.update(preds, y)
+            
+            
             loss = loss_fn(logits, y)
             loss_acc += loss.item()
 
@@ -108,12 +206,8 @@ def one_epoch(model: torch.nn.Module, dataloader: torch.utils.data.DataLoader, o
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-            i+=1
-            if (i % 10) == 0:
-                print(f'batch {i} done, f1_score : {f1_score}')
-    
-    f1_score = f1_metric_obj.compute().item()
-    return f1_score, loss_acc
+        
+    return loss_acc
 
 def construct_paths(save_path, save_name):
     if save_path is not None:    
@@ -123,7 +217,7 @@ def construct_paths(save_path, save_name):
     
 
 def train(model: nn.Module, train_dataset: Dataset, val_dataset :Dataset, loss_fn, optimizer,   
-        epochs=30, verbose= False, save_path: str|None=None, save_name='model.pt', warmup=5, patience=10, device=torch.device('cpu')):
+        epochs=30, verbose= False, save_path: str|None=None, save_name='model.pt', warmup=5, patience=10, device=torch.device('cpu'), metrics=None):
     '''
     Executa um treinamento completo do modelo passado, utiliza a função CrossEntropyLoss e otimizador Adam.
     Early Stopping com paciência de 10 épocas e Warmup definido em 5 épocas.
@@ -134,16 +228,10 @@ def train(model: nn.Module, train_dataset: Dataset, val_dataset :Dataset, loss_f
     
     num_workers = max(1,os.cpu_count()-1)
 
-    
-    train_dataloader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=num_workers)
-    val_dataloader = DataLoader(val_dataset, batch_size=128, shuffle=True, num_workers=num_workers)
-    
+    train_dataloader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=num_workers, pin_memory=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=128, shuffle=True, num_workers=num_workers, pin_memory=True)
     model = model.to(device)
-    #model = model.to(device)
-    #loss_fn = nn.CrossEntropyLoss(reduction='mean')
-    #optimizer = torch.optim.Adam(params= model.parameters(), lr = 0.001)
-    
-           
+        
     history = {
         'train_loss' : [],
         'val_loss' : [],
@@ -153,8 +241,6 @@ def train(model: nn.Module, train_dataset: Dataset, val_dataset :Dataset, loss_f
         'val_f1_macro' : [],
     }
     
-    warmup_threshold = warmup
-    patience_threshold = patience
     no_improve_counter = 0
     new_best_flag = False
     min_val_loss_mean = float(1e6)
@@ -209,54 +295,53 @@ def train(model: nn.Module, train_dataset: Dataset, val_dataset :Dataset, loss_f
         
     else : epoch_tqdm_bar.set_description(desc=f'No Info')
 
+    early_stopper = EarlyStopping(patience=patience)
     
     for epoch in epoch_tqdm_bar:
         last_epoch = epoch
         
         ### training
-        train_f1_score, train_loss = one_epoch(model, train_dataloader, optimizer, loss_fn, device)
+        train_loss = one_epoch(model, train_dataloader, optimizer, loss_fn, device)
         train_loss_mean = train_loss / len(train_dataloader)
-        #train_accuracy, train_f1_macro = calculate_metrics(y_true, y_pred)
         
         history['train_loss'].append(train_loss_mean)
-        history['train_accuracy'].append(0)
-        history['train_f1_macro'].append(0)
+        if metrics is not None:
+            history['train_accuracy'].append(0)
+            history['train_f1_macro'].append(0)
         
-        ### validation
-        val_f1_score, val_loss = one_epoch(model, val_dataloader, optimizer, loss_fn, device, is_eval=True)
+        val_loss = one_epoch(model, val_dataloader, optimizer, loss_fn, device, is_eval=True)
         val_loss_mean = val_loss / len(val_dataloader)     
-        #val_accuracy, val_f1_macro = calculate_metrics(y_true, y_pred)
-        
+    
         history['val_loss'].append(val_loss_mean)
-        history['val_accuracy'].append(0)
-        history['val_f1_macro'].append(0)
+        if metrics is not None:
+            history['val_accuracy'].append(0)
+            history['val_f1_macro'].append(0)
         
-        ## warmup logic
-        ## if the warmup was done and had no improvement
-        new_best_flag = False
-        if (val_loss_mean >= min_val_loss_mean): ## no improvement
-            if epoch >= warmup_threshold: ## warmup done
-                no_improve_counter = no_improve_counter + 1 ## att counter
-        else: ## new min, reset counter, save best model
-            new_best_flag = True
-            no_improve_counter = 0
+        if epoch >= warmup:
+                should_stop = early_stopper.step(val_loss_mean)
+                new_best = early_stopper.is_best()
+        else:
+            new_best = val_loss_mean < min_val_loss_mean
+        
+        if new_best:
             min_val_loss_mean = val_loss_mean
-            if save_path is not None:
-                save_my_checkpoint(model, optimizer, loss_fn, min_val_loss_mean, epoch, history, best_model_path,is_best=True)
-        
-        att_desc_tqdm_bar(epoch_tqdm_bar, epoch, train_loss, train_f1_score, 
-                          val_loss, min_val_loss_mean, val_f1_score, new_best=new_best_flag)
+            history['min_val_loss'] = min_val_loss_mean
+            if best_model_path:
+                save_my_checkpoint(epoch, best_model_path, is_best=True)
+            
+        att_desc_tqdm_bar(epoch_tqdm_bar, epoch, train_loss, 0.0, 
+                          val_loss, min_val_loss_mean, 0.0, new_best=new_best_flag)
         
         ## early stopping
-        if no_improve_counter >= patience_threshold:           
-            break
+        if should_stop: break
         
-        if ((epoch+1)%5==0) or (new_best_flag): ## saving model in from 5 to 5 iterations or if the new best is found
-            save_my_checkpoint(model, optimizer, loss_fn, min_val_loss_mean, epoch, history, model_path, is_best=new_best_flag)
+        if model_path is not None:
+                if ((epoch + 1) % 5 == 0) or new_best:
+                    save_my_checkpoint(epoch, model_path, is_best=new_best)
                       
-    if no_improve_counter >= patience_threshold:
+    if no_improve_counter >= patience:
         if verbose: 
-            _msg_str = f'At Epoch [{epoch + 1}], it had {patience_threshold} iterations with no improvement on the validation dataset. Stopping ...' 
+            _msg_str = f'At Epoch [{epoch + 1}], it had {patience} iterations with no improvement on the validation dataset. Stopping ...' 
             print(_msg_str)           
         
         
