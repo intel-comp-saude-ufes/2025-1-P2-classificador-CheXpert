@@ -163,25 +163,27 @@ def train(model: nn.Module, train_dataloader: Dataset, val_dataloader :Dataset, 
         train_loss = one_epoch(model, train_dataloader, optimizer, loss_fn, device, metric_obj=metrics)
         train_loss_mean = train_loss / len(train_dataloader)
 
-        history.log(train_loss=train_loss_mean)
         train_metrics = metrics.compute()
         metrics.reset()
-        
-        history.log(**{f'train_{k}': v for k,v in train_metrics.items()})
+        train_metrics['loss'] = train_loss_mean
+        train_metrics = {f'train_{k}': v for k,v in train_metrics.items()}
         
         ## validation
         val_loss = one_epoch(model, val_dataloader, optimizer, loss_fn, device, is_eval=True, metric_obj=metrics)
         val_loss_mean = val_loss / len(val_dataloader)     
     
-        history.log(val_loss=val_loss_mean)
         val_metrics = metrics.compute()
         metrics.reset()
+        val_metrics['loss'] = val_loss_mean
+        val_metrics = {f'val_{k}': v for k,v in val_metrics.items()}
         
-        history.log(**{f'val_{k}': v for k,v in val_metrics.items()})
+        history.log(**train_metrics)
+        history.log(**val_metrics)
         
         should_stop = False
         new_best=False
         
+        ## integrar warmup dentro do earlystopping
         if epoch >= warmup:
                 should_stop = early_stopper.step(val_metrics)
                 new_best = early_stopper.is_best()
@@ -215,7 +217,10 @@ def train(model: nn.Module, train_dataloader: Dataset, val_dataloader :Dataset, 
                         }
                         save_checkpoint(model_path, model, optimizer, epoch,
                                         metadata=metadata)
-                                              
+        
+        print(history.get_inner_dict())
+        
+                                       
     if no_improve_counter >= patience:
         if verbose: 
             _msg_str = f'At Epoch [{epoch + 1}], it had {patience} iterations with no improvement on the validation dataset. Stopping ...' 

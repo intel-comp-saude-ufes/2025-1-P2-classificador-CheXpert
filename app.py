@@ -50,4 +50,4 @@ if __name__ == '__main__':
     val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=128, shuffle=True, num_workers=num_workers, pin_memory=True)
     
     
-    train(model, train_dataloader, val_dataloader, loss_fn, optimizer, save_path='./', device=device, metrics=metric_collection)
+    train(model, train_dataloader, val_dataloader, loss_fn, optimizer, save_path='./', device=device, metrics=metric_collection, warmup=0)
