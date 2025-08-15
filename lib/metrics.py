@@ -66,6 +66,8 @@ class MetricCollection:
 
 '''
 
+
+'''
 class MetricCollection:
     def __init__(self, device, num_classes: int, task_type: str):
         self.device = device
@@ -96,6 +98,27 @@ class MetricCollection:
         else:
             raise ValueError(f"Tarefa inválida: {task_type}. Use 'binary', 'multiclass' ou 'multilabel'.")
 
+    def update(self, preds, targets):
+        for metric in self.metrics.values():
+            metric.update(preds, targets)
+
+    def compute(self):
+        return {name: metric.compute().item() for name, metric in self.metrics.items()}
+
+    def reset(self):
+        for metric in self.metrics.values():
+            metric.reset()
+'''
+            
+class MetricCollection:
+    def __init__(self, device):
+        self.device = device
+
+        self.metrics = dict({})
+
+    def register(self, name:str, metric):
+        self.metrics[name] = metric.to(self.device)
+        
     def update(self, preds, targets):
         for metric in self.metrics.values():
             metric.update(preds, targets)
