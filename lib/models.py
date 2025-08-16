@@ -1,14 +1,15 @@
 from torch import nn
 import torch
-from torchvision.models import resnet18, ResNet18_Weights
+from torchvision.models import resnet18, ResNet18_Weights, resnet34, ResNet34_Weights
+from torchvision.models import mobilenet_v3_large, mobilenet_v2, MobileNet_V3_Large_Weights, MobileNet_V2_Weights
+from torchvision.models import densenet121, densenet161, DenseNet121_Weights, DenseNet161_Weights
 
-class MyResnet18(nn.Module):
-    def __init__(self, n_classes=2):
-        super(MyResnet18, self).__init__()
-        
-        modules = list(resnet18(weights=ResNet18_Weights.IMAGENET1K_V1).children())
-        self.feature_extractor = nn.Sequential(*modules[:-1])
-        self.classifier = nn.LazyLinear(n_classes)
+
+class FreezableCNN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.feature_extractor = None
+        self.classifier = None
 
     def forward(self, X):
         features = self.feature_extractor(X)
@@ -27,6 +28,54 @@ class MyResnet18(nn.Module):
             param.requires_grad = True
         for param in self.classifier.parameters():
             param.requires_grad = True
+
+
+class MyResnet(FreezableCNN):
+    def __init__(self, resnet_version: str, n_classes=2):
+        super().__init__()
+        self.version = resnet_version
+
+        if resnet_version == 'resnet18':
+            modules = list(resnet18(weights=ResNet18_Weights.DEFAULT).children())
+        elif resnet_version == 'resnet34':
+            modules = list(resnet34(weights=ResNet34_Weights.DEFAULT).children())
+        else:
+            raise ValueError(f'invalid resnet version `{resnet_version}`')
+
+        self.feature_extractor = nn.Sequential(*modules[:-1])
+        self.classifier = nn.LazyLinear(n_classes)
+
+
+class MyMobileNet(FreezableCNN):
+    def __init__(self, mobilenet_version: str, n_classes=2):
+        super().__init__()
+        self.version = mobilenet_version
+
+        if mobilenet_version == 'mobilenet_v3_large':
+            modules = list(mobilenet_v3_large(weights=MobileNet_V3_Large_Weights.DEFAULT).children())
+        elif mobilenet_version == 'mobilenet_v2':
+            modules = list(mobilenet_v2(weights=MobileNet_V2_Weights.DEFAULT).children())
+        else:
+            raise ValueError(f'invalid mobilenet version `{mobilenet_version}`')
+
+        self.feature_extractor = nn.Sequential(*modules[:-1])
+        self.classifier = nn.LazyLinear(n_classes)
+
+
+class MyDenseNet(FreezableCNN):
+    def __init__(self, densenet_version: str, n_classes=2):
+        super().__init__()
+        self.version = densenet_version
+
+        if densenet_version == 'densenet121':
+            modules = list(densenet121(weights=DenseNet121_Weights.DEFAULT).children())
+        elif densenet_version == 'densenet161':
+            modules = list(densenet161(weights=DenseNet161_Weights.DEFAULT).children())
+        else:
+            raise ValueError(f'invalid densenet version `{densenet_version}`')
+
+        self.feature_extractor = nn.Sequential(*modules[:-1])
+        self.classifier = nn.LazyLinear(n_classes)
 
 
 def freeze_feature_extractor(model: nn.Module, head_attr: str = 'fc', frozen: bool = True):

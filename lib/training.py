@@ -110,7 +110,7 @@ def train(model: nn.Module, train_dataloader: Dataset, val_dataloader :Dataset, 
     no_improve_counter = 0
     new_best = False
     min_val_loss_mean = float('inf')
-    last_epoch = 0
+    last_epoch = -1
     starting_epoch = 0
     
     early_stopper = EarlyStopping(patience=patience, mode='min', monitor='val_loss')
@@ -205,9 +205,6 @@ def train(model: nn.Module, train_dataloader: Dataset, val_dataloader :Dataset, 
         att_desc_tqdm_bar(epoch_tqdm_bar, epoch, history.last('train_loss'), history.last('train_accuracy'), 
                           history.last('val_loss'), min_val_loss_mean, history.last('val_accuracy'), new_best=new_best)
         
-        ## early stopping
-        if should_stop: break
-        
         if model_path is not None:
                 if ((epoch + 1) % 5 == 0) or new_best:
                         metadata = {
@@ -215,9 +212,25 @@ def train(model: nn.Module, train_dataloader: Dataset, val_dataloader :Dataset, 
                             'history' : history.get_inner_dict(),
                             'is_best' : new_best,
                         }
+                        
                         save_checkpoint(model_path, model, optimizer, epoch,
-                                        metadata=metadata)
-                                               
+                                        metadata=metadata)   
+                               
+        ## early stopping
+        if should_stop: break
+    
+    ## entered in the loop
+    if last_epoch !=-1:   
+        metadata = {
+                    'min_val_loss' : min_val_loss_mean,
+                    'history' : history.get_inner_dict(),
+                    'is_best' : new_best,
+                }
+        
+        save_checkpoint(model_path, model, optimizer, epoch,
+                        metadata=metadata)  
+    
+                                             
     if no_improve_counter >= patience:
         if verbose: 
             _msg_str = f'At Epoch [{epoch + 1}], it had {patience} iterations with no improvement on the validation dataset. Stopping ...' 
