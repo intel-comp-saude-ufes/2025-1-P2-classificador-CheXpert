@@ -64,7 +64,7 @@ class ChestXrayDataset(Dataset):
                     break  # não adiciona mais imagens
 
             print(f"Cache carregado: {len(self._cached_imgs)}/{len(self._data)} imagens, "
-                  f"≈ {current_cache_bytes / 1024**2:.2f} MB")
+                  f"~= {current_cache_bytes / 1024**2:.2f} MB")
 
     def __len__(self):
         return len(self._data)

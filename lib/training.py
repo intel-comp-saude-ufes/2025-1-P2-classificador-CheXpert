@@ -217,13 +217,10 @@ def train(model: nn.Module, train_dataloader: Dataset, val_dataloader :Dataset, 
                         }
                         save_checkpoint(model_path, model, optimizer, epoch,
                                         metadata=metadata)
-        
-        print(history.get_inner_dict())
-        
-                                       
+                                               
     if no_improve_counter >= patience:
         if verbose: 
             _msg_str = f'At Epoch [{epoch + 1}], it had {patience} iterations with no improvement on the validation dataset. Stopping ...' 
             print(_msg_str)           
         
-    return history, model
+    return history.get_inner_dict(), model

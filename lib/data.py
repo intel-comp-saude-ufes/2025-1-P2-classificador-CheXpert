@@ -8,6 +8,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms import v2
 from torchvision.datasets import ImageFolder
 from torch.utils.data import Subset, random_split
+from sklearn.model_selection import StratifiedKFold
 
 class CheXpertDataSet(Dataset):
     def __init__(self, data_df, label_columns, meta_columns, path_column, transformation=None):
@@ -212,31 +213,57 @@ def my_random_split(dataset: ImageFolder, size=float) -> tuple[Subset, Subset]:
 
 
 ## https://www.kaggle.com/datasets/alsaniipe/chest-x-ray-image
-def get_data_chest_x_ray_image():
-    '''
-    le os dados do kaggle e retorna um dicionário contendo todos so datasets já com transformações definidas, além de outros metadados
-    '''
+def get_data_chest_x_ray_image(img_size=(224, 224), split_ratio=0.8, kfold=None, seed=42):
+    """
+    Carrega dataset de Raio-X do Kaggle e retorna dados no formato:
+      - Modo normal: retorna train_dataset e val_dataset já com transformações
+      - Modo K-Fold: retorna base_dataset, lista de folds e metadados
+    """
+    # Baixar dados
     PATH = kagglehub.dataset_download("alsaniipe/chest-x-ray-image")    
     train_path = os.path.join(PATH, 'Data/train')
     test_path = os.path.join(PATH, 'Data/test')
 
     base_train_dataset = ImageFolder(root=train_path)
-    train_subset, val_subset = my_random_split(base_train_dataset, size=0.8)
-
-    train_transform, test_transform = get_transformations(img_size=(224, 224))
-    
-    ## validação e teste recebem o mesmo transformador
-    train_dataset = TransformDataset(train_subset, train_transform)
-    val_dataset = TransformDataset(val_subset, test_transform)
+    train_transform, test_transform = get_transformations(img_size=img_size)
     test_dataset = ImageFolder(root=test_path, transform=test_transform)
 
-    data = {
-        'train_dataset': train_dataset,
-        'val_dataset' : val_dataset,
-        'test_dataset': test_dataset,
-        'idx_to_class': {v: k for k, v in base_train_dataset.class_to_idx.items()},
-        'class_to_idx': base_train_dataset.class_to_idx,
-        'classes': base_train_dataset.classes,
-    }
-    
-    return data
+    idx_to_class = {v: k for k, v in base_train_dataset.class_to_idx.items()}
+
+    # -------------------------
+    # MODO NORMAL (sem K-Fold)
+    # -------------------------
+    if kfold is None:
+        train_subset, val_subset = my_random_split(base_train_dataset, size=split_ratio)
+        train_dataset = TransformDataset(train_subset, train_transform)
+        val_dataset = TransformDataset(val_subset, test_transform)
+
+        return {
+            'mode': 'normal',
+            'train_dataset': train_dataset,
+            'val_dataset': val_dataset,
+            'test_dataset': test_dataset,
+            'idx_to_class': idx_to_class,
+            'class_to_idx': base_train_dataset.class_to_idx,
+            'classes': base_train_dataset.classes
+        }
+
+    # -------------------------
+    # MODO K-FOLD
+    # -------------------------
+    else:
+        targets = [y for _, y in base_train_dataset]  # labels para stratificação
+        skf = StratifiedKFold(n_splits=kfold, shuffle=True, random_state=seed)
+        folds = list(skf.split(range(len(base_train_dataset)), targets))
+
+        return {
+            'mode': 'kfold',
+            'base_dataset': base_train_dataset,
+            'folds': folds,  # lista de (train_idx, val_idx)
+            'train_transform': train_transform,
+            'val_transform': test_transform,
+            'test_dataset': test_dataset,
+            'idx_to_class': idx_to_class,
+            'class_to_idx': base_train_dataset.class_to_idx,
+            'classes': base_train_dataset.classes
+        }
