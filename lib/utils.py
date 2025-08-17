@@ -3,7 +3,6 @@ def get_device():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'    
     return torch.device(device=device)
 
-
 def show_batch(title: str, images, labels, label_map: dict, device=None, net=None, path=None, grad_cam=False, target_layer=None):
     '''
     Plota um batch. Se o modelo não for None, calcula as predições e plota junto. Se path não for None, salva a imagem em path como png. 
@@ -79,3 +78,57 @@ def show_batch(title: str, images, labels, label_map: dict, device=None, net=Non
     plt.show()
     
     return
+
+def plot_evolution(y_values: list[list], y_labels, title='Evolution', xlabel='Iterations', ylabel='Values', path=None, vlines=None):
+    import matplotlib.pyplot as plt
+    import os
+    import itertools
+
+    assert(path is not None)
+    _dir = os.path.dirname(path)
+    assert(os.path.exists(_dir))
+
+    x_ = list(range(1, len(y_values[0]) + 1))
+
+    plt.figure(figsize=(15, 10))
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.grid(visible=False)
+    plt.tight_layout()
+
+    linestyles = ['-', '--', '-.', ':']
+    linecycler = itertools.cycle(linestyles)
+    for y, label in zip(y_values, y_labels):
+        linestyle = next(linecycler)
+        plt.plot(x_, y, linestyle=linestyle, label=label, marker='o')
+    
+    if vlines is not None:
+        colors = ['red', 'green', 'blue', 'orange', 'purple', 'brown', 'pink', 'cyan']
+        colorcycler = itertools.cycle(colors)
+        for x in vlines:
+            plt.axvline(x=x, color=next(colorcycler), linestyle='--', linewidth=1.5)
+
+    plt.legend(loc='upper right', ncol=1, fontsize='x-large')
+    plt.savefig(path, dpi=300)
+    plt.close()
+    return
+
+
+def plot_confusion_matrix(y_true, y_pred, class_map=None, save_path=None):
+    import matplotlib.pyplot as plt
+    from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+
+    cm = confusion_matrix(y_true, y_pred)
+    if class_map is not None:
+        labels = [class_map[i] for i in sorted(class_map.keys())]
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
+    else:
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+
+    disp.plot(cmap="Blues", xticks_rotation=45)
+    if save_path is not None:
+        plt.savefig(save_path, bbox_inches='tight', dpi=300)
+    plt.show()
+    return
+

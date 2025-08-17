@@ -43,6 +43,9 @@ class CheXpertDataSet(Dataset):
 ## path = '/home/msmartin/.cache/kagglehub/datasets/ashery/chexpert/versions/1' (linux)
 ## path = 'C:\\Users\\matheus\\.cache\\kagglehub\\datasets\\ashery\\chexpert\\versions\\1' (windows)
 
+def to_rgb(x):
+    return x.convert("RGB")
+
 def get_transformations(img_size = (224, 224)):
     
     '''
@@ -50,7 +53,7 @@ def get_transformations(img_size = (224, 224)):
     '''
     
     train_transform = v2.Compose([
-        v2.Lambda(lambda img: img.convert("RGB")), ## colocando em rgb
+        v2.Lambda(to_rgb), ## colocando em rgb
         v2.Resize(img_size),
         v2.ToImage(),  # Convert to tensor, only needed if you had a PIL image
         v2.ToDtype(torch.uint8, scale=True),  # optional, most input are already uint8 at this point
@@ -64,7 +67,7 @@ def get_transformations(img_size = (224, 224)):
     ])
     
     test_transform = v2.Compose([
-        v2.Lambda(lambda img: img.convert("RGB")), ## colocando em rgb
+        v2.Lambda(to_rgb), ## colocando em rgb
         v2.ToImage(),  # Convert to tensor, only needed if you had a PIL image
         v2.Resize(img_size),
         v2.ToDtype(torch.float32, scale=True),  # Normalize expects float input
@@ -261,7 +264,7 @@ def get_data_chest_x_ray_image(img_size=(224, 224), split_ratio=0.8, kfold=None,
             'base_dataset': base_train_dataset,
             'folds': folds,  # lista de (train_idx, val_idx)
             'train_transform': train_transform,
-            'val_transform': test_transform,
+            'test_transform': test_transform,
             'test_dataset': test_dataset,
             'idx_to_class': idx_to_class,
             'class_to_idx': base_train_dataset.class_to_idx,

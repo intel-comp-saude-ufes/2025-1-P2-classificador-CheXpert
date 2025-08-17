@@ -25,24 +25,27 @@ def file_exists(path):
     return (p.exists() and p.is_file())
 
 
-def eval(model:torch.nn.Module, eval_dataset:torch.utils.data.Dataset, device:torch.device):
-    '''
-    Avalia o modelo em um dataset e retorna listas contendo os labels reais e as predições (y_true e y_pred).
-    '''
-    import torch
-    from torch.utils.data.dataloader import DataLoader
-    y_true = []
-    y_pred = []
-    eval_dataloader = DataLoader(eval_dataset, batch_size=64, shuffle=True)
+def eval(model: torch.nn.Module, eval_dataloader, device, task="multiclass", threshold=0.5):
+    y_true, y_pred = [], []
     model.eval()
     with torch.no_grad():
-        for X,y in eval_dataloader:
-            X,y = X.to(device), y.to(device)        
+        for X, y in tqdm(eval_dataloader, desc="Evaluating", leave=False):
+            X, y = X.to(device), y.to(device)
             logits = model(X)
-            preds = torch.argmax(logits, dim=1)
-            y_pred.extend(preds.cpu().numpy())
-            y_true.extend(y.cpu().numpy())    
-    return (y_true, y_pred)
+
+            if task == "binary":
+                preds = (torch.sigmoid(logits) > threshold).int().cpu().numpy()
+
+            elif task == "multiclass":
+                preds = torch.argmax(logits, dim=1).cpu().numpy()
+
+            elif task == "multilabel":
+                preds = (torch.sigmoid(logits) > threshold).int().cpu().numpy()
+
+            y_pred.extend(preds)
+            y_true.extend(y.cpu().numpy())
+    return y_true, y_pred
+
 
 
 def one_epoch(model: torch.nn.Module, dataloader: torch.utils.data.DataLoader, optimizer, loss_fn, device: torch.device, is_eval:bool=False, metric_obj = None):
