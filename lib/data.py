@@ -189,17 +189,23 @@ def get_data() -> dict:
 #---------------------------------------------------------
 
 class TransformDataset(Dataset):
-    def __init__(self, subset, transform):
+    def __init__(self, subset, transform=None, class_map=None):
         self.subset = subset
         self.transform = transform
+        self.class_map=class_map
 
     def __len__(self):
         return len(self.subset)
 
     def __getitem__(self, idx):
         img, label = self.subset[idx]
+        
+        if self.class_map:
+            label = self.class_map[label]
+        
         if self.transform:
             img = self.transform(img)
+            
         return img, label
 
 

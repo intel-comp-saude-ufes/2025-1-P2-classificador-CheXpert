@@ -3,7 +3,7 @@ import torch
 from torchvision.models import resnet18, ResNet18_Weights, resnet34, ResNet34_Weights
 from torchvision.models import mobilenet_v3_large, mobilenet_v2, MobileNet_V3_Large_Weights, MobileNet_V2_Weights
 from torchvision.models import densenet121, densenet161, DenseNet121_Weights, DenseNet161_Weights
-
+from torchvision.models import vit_b_16, vit_b_32, ViT_B_16_Weights, ViT_B_32_Weights
 
 class FreezableCNN(nn.Module):
     def __init__(self):
@@ -76,6 +76,42 @@ class MyDenseNet(FreezableCNN):
 
         self.feature_extractor = nn.Sequential(*modules[:-1])
         self.classifier = nn.LazyLinear(n_classes)
+        
+        
+class MyViT(nn.Module):
+    def __init__(self, vit_version: str, n_classes=2):
+        super().__init__()
+        self.version = vit_version
+
+        if vit_version == 'vit_b_16':
+            self.vit = vit_b_16(weights=ViT_B_16_Weights.DEFAULT)
+        elif vit_version == 'vit_b_32':
+            self.vit = vit_b_32(weights=ViT_B_32_Weights.DEFAULT)
+        else:
+            raise ValueError(f'Invalid ViT version `{vit_version}`')
+
+        self.vit.heads = nn.Identity()  
+        self.classifier = nn.LazyLinear(n_classes)
+
+    def forward(self, x):
+        features = self.vit(x)  
+        logits = self.classifier(features)
+        return logits
+
+    def freeze(self, upto_layer=None):
+        """
+        Congela até determinada camada do ViT.
+        Se upto_layer=None, congela tudo.
+        """
+        for idx, param in enumerate(self.vit.parameters()):
+            if upto_layer is None or idx <= upto_layer:
+                param.requires_grad = False
+            else:
+                param.requires_grad = True
+
+    def unfreeze(self):
+        for param in self.vit.parameters():
+            param.requires_grad = True
 
 
 def freeze_feature_extractor(model: nn.Module, head_attr: str = 'fc', frozen: bool = True):
