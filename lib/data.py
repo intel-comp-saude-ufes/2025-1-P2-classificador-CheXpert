@@ -5,34 +5,37 @@ from PIL import Image
 
 import torch
 from torch.utils.data import Dataset, DataLoader
+
 from torchvision.transforms import v2
 from torchvision.datasets import ImageFolder
+from torchvision.io import read_image
+
 from torch.utils.data import Subset, random_split
 from sklearn.model_selection import StratifiedKFold
 
 class CheXpertDataSet(Dataset):
-    def __init__(self, data_df, label_columns, meta_columns, path_column, transformation=None):
+    def __init__(self, data_df, label_columns, path_column, transformation=None):
         self.label_columns = label_columns
-        self.meta_columns = meta_columns
         self.path_column = path_column
         
-        self.path_series = data_df[path_column] ## it is more eficient to save strings on Series or python lists than in nparrays
-        self.meta_data = data_df[meta_columns].to_numpy()
-        self.label_data = data_df[label_columns].to_numpy()
+        self.path_series = data_df[path_column]
+        self.label_data = torch.tensor(data_df[label_columns].values, dtype=torch.float32)
         
-        self.transformation=transformation        
+        self.transformation = transformation
+               
         return 
     
     def __len__(self):
         return len(self.path_series)
     
     def __getitem__(self, index):
-        img = Image.open(self.path_series[index])
+        img = read_image(self.path_series.iloc[index]) ## é mais eficiente
+        
         if self.transformation:
             img = self.transformation(img)
             
         y = self.label_data[index]        
-        metadata = self.meta_data[index]
+        
         return img, y
     
     def to_dataloader(self, batch_size=64, shuffle=False):
@@ -43,14 +46,16 @@ class CheXpertDataSet(Dataset):
 ## path = '/home/msmartin/.cache/kagglehub/datasets/ashery/chexpert/versions/1' (linux)
 ## path = 'C:\\Users\\matheus\\.cache\\kagglehub\\datasets\\ashery\\chexpert\\versions\\1' (windows)
 
+###old version
+'''
 def to_rgb(x):
     return x.convert("RGB")
 
 def get_transformations(img_size = (224, 224)):
     
-    '''
-    contém a definição das transformações utilizadas nesse trabalho
-    '''
+    
+    ###contém a definição das transformações utilizadas nesse trabalho
+    
     
     train_transform = v2.Compose([
         v2.Lambda(to_rgb), ## colocando em rgb
@@ -71,6 +76,40 @@ def get_transformations(img_size = (224, 224)):
         v2.ToImage(),  # Convert to tensor, only needed if you had a PIL image
         v2.Resize(img_size),
         v2.ToDtype(torch.float32, scale=True),  # Normalize expects float input
+        v2.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+    ])
+    
+    return (train_transform, test_transform)
+'''
+
+
+def to_rgb_if_needed(x):
+    # Verifica o número de canais (a primeira dimensão do tensor)
+    if x.shape[0] == 1:
+        # Se for 1, replica o canal 3 vezes.
+        return x.repeat(3, 1, 1)
+    return x
+
+def get_transformations(img_size = (224, 224)):
+    
+    train_transform = v2.Compose([
+        v2.ToImage(),  # 1. Converte a imagem PIL para um tensor
+        v2.Lambda(to_rgb_if_needed), # 2. Garante que o tensor tenha 3 canais
+        v2.Resize(img_size), # 3. Redimensiona a imagem
+        v2.ToDtype(torch.float32, scale=True), # 4. Converte para float e normaliza para o intervalo [0, 1]
+        ####### Data Augmentation #######
+        v2.RandomHorizontalFlip(p=0.5),
+        v2.RandomAffine(degrees=5, translate=(0.05, 0.05)),
+        v2.RandomPerspective(0.1),
+        ################################
+        v2.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]), # 5. Normaliza os dados
+    ])
+    
+    test_transform = v2.Compose([
+        v2.ToImage(),
+        v2.Lambda(to_rgb_if_needed),
+        v2.Resize(img_size),
+        v2.ToDtype(torch.float32, scale=True),
         v2.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
     ])
     
@@ -127,7 +166,7 @@ def filter_data_frame(df:pd.DataFrame, size=0.1):
     return df
 
 
-def get_data() -> dict:
+def get_chexpert() -> dict:
     path = kagglehub.dataset_download("ashery/chexpert")
     #path = 'C:\\Users\\matheus\\.cache\\kagglehub\\datasets\\ashery\\chexpert\\versions\\1'
     #path = '/home/msmartin/.cache/kagglehub/datasets/ashery/chexpert/versions/1'
@@ -153,6 +192,9 @@ def get_data() -> dict:
     metadata_columns = ['Sex', 'Age', 'AP/PA']
     path_column = 'Path'
     label_columns = [c for c in df_train.columns if c not in (metadata_columns + [path_column])]
+    data_dict['classes'] = label_columns
+    data_dict['idx_to_class'] = {idx:label for idx,label in enumerate(label_columns)}
+    data_dict['class_to_idx'] = {label: idx for idx,label in enumerate(label_columns)}
     
     ## metadata_columns : Sex, Age, AP/PA
     categoric_columns = ['Sex', 'AP/PA'] 
@@ -168,7 +210,7 @@ def get_data() -> dict:
     df_train = treat_df_label_columns(df_train, label_columns, inplace=True)
     df_valid = treat_df_label_columns(df_valid, label_columns, inplace=True)
     
-    df_train = filter_data_frame(df_train, size=0.05) ## filtrando pra testar
+    df_train = filter_data_frame(df_train, size=1.00) ## filtrando pra testar
     print('lines:',df_train.shape[0])
     
     df_train = df_train.reset_index(drop=True) # this is needed, do not remove this reset index lines (DataSet stores pandas Series, so they must have the correct indexes)
@@ -176,8 +218,8 @@ def get_data() -> dict:
     
     ## there is no Path or Age with nan value both in train and valid dataframes !!!
     
-    train_dataset = CheXpertDataSet(df_train, label_columns, metadata_columns, path_column, transformation=train_transformation)
-    test_dataset = CheXpertDataSet(df_valid, label_columns, metadata_columns, path_column, transformation=test_transformation)
+    train_dataset = CheXpertDataSet(df_train, label_columns, path_column, transformation=train_transformation)
+    test_dataset = CheXpertDataSet(df_valid, label_columns, path_column, transformation=test_transformation)
     
     data_dict['train_dataset'] = train_dataset
     data_dict['test_dataset'] = test_dataset
