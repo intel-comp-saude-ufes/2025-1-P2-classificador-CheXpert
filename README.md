@@ -17,6 +17,8 @@ Lista das dependências necessárias para executar o projeto.
 
 * Arquivo de metadados para a geração de gráficos.
 
+* Link para o [artigo científico](./Transfer_Learning_para_Generalizacao_de_Redes_Neurais_Convolucionais_em_Radiografias_de_Torax.pdf) referente à pesquisa que gerou o repositório e link para o resumo explicativo do artigo em [vídeo](https://youtu.be/h2hNoge2ouY).
+
 ---
 # Estrutura do repositório
 Este projeto é estruturado para:
