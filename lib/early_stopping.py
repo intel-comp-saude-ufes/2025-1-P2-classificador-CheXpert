@@ -1,5 +1,14 @@
 class EarlyStopping:
+    '''
+    Classe que contém a lógica de early stopping que foi utilizada no treinamento dos modelos
+    '''
+    
     def __init__(self, patience=10, min_delta=0.0, mode="min", monitor="val_loss"):
+        '''
+        monitor = métrica alvo
+        mode = função a ser aplicada para comparação de valores
+        '''
+        
         if mode not in ["min", "max"]:
             raise ValueError("mode must be 'min' or 'max'")
         
@@ -13,6 +22,10 @@ class EarlyStopping:
         self.best_flag = False
 
     def step(self, metrics: dict) -> bool:
+        '''
+        metrics = dicionário de métricas do treinamento, no qual a métrica do monitor deve estar presente
+        '''
+        
         if self.monitor not in metrics:
             raise KeyError(f"Metric '{self.monitor}' was not found in the metrics dictionary.")
 

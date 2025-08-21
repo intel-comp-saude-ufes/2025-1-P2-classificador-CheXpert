@@ -43,50 +43,8 @@ class CheXpertDataSet(Dataset):
         return DataLoader(dataset=dataset, batch_size=batch_size, shuffle=shuffle)
 
 
-## path = '/home/msmartin/.cache/kagglehub/datasets/ashery/chexpert/versions/1' (linux)
-## path = 'C:\\Users\\matheus\\.cache\\kagglehub\\datasets\\ashery\\chexpert\\versions\\1' (windows)
-
-###old version
-'''
-def to_rgb(x):
-    return x.convert("RGB")
-
-def get_transformations(img_size = (224, 224)):
-    
-    
-    ###contém a definição das transformações utilizadas nesse trabalho
-    
-    
-    train_transform = v2.Compose([
-        v2.Lambda(to_rgb), ## colocando em rgb
-        v2.Resize(img_size),
-        v2.ToImage(),  # Convert to tensor, only needed if you had a PIL image
-        v2.ToDtype(torch.uint8, scale=True),  # optional, most input are already uint8 at this point
-        #######
-        v2.RandomHorizontalFlip(p=0.5),
-        v2.RandomAffine(degrees=5, translate=(0.05, 0.05)),
-        v2.RandomPerspective(0.1),
-        ########
-        v2.ToDtype(torch.float32, scale=True),  # Normalize expects float input
-        v2.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-    ])
-    
-    test_transform = v2.Compose([
-        v2.Lambda(to_rgb), ## colocando em rgb
-        v2.ToImage(),  # Convert to tensor, only needed if you had a PIL image
-        v2.Resize(img_size),
-        v2.ToDtype(torch.float32, scale=True),  # Normalize expects float input
-        v2.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-    ])
-    
-    return (train_transform, test_transform)
-'''
-
-
 def to_rgb_if_needed(x):
-    # Verifica o número de canais (a primeira dimensão do tensor)
-    if x.shape[0] == 1:
-        # Se for 1, replica o canal 3 vezes.
+    if x.shape[0] == 1: ## Converte para RGB caso for gray scale
         return x.repeat(3, 1, 1)
     return x
 
@@ -127,26 +85,17 @@ def treat_df_label_columns(df: pd.DataFrame, label_columns: list[str], inplace=F
     df[label_columns] = df[label_columns].replace({-1:0})
     return df 
 
-def prepare_img_tensor(img_t, mean, std):  
+def prepare_img_tensor(img_t, mean, std):
+    '''
+    Desfaz transformações aplicadas na imagem para plot com matplotlib
+    '''
+    
     mean = torch.tensor(mean, dtype=img_t.dtype, device=img_t.device).view(3, 1, 1)
     std = torch.tensor(std, dtype=img_t.dtype, device=img_t.device).view(3, 1, 1)
     img_t = img_t * std + mean
     img_t = img_t.clamp(0, 1)
     img_t = img_t.permute(1, 2, 0)  # (H, W, C)
     return img_t.cpu().numpy()
-
-'''
-    -1 --> inconclusivo
-    none --> dado faltante
-    
-    Especificação da coluna AP/PA
-        AP --> raio x entra pela frente e sai atrás
-        PA --> raio x entra por trás e sai na frente
-        
-        No Finding -> A coluna No Finding é um indicador de ausência de todas as outras patologias. Ela é derivada dos demais rótulos 
-            não tem valor clínico como informação extra a ser passada junto com a imagem.
-            Pode ser usada pra transformar o problema em classificação binária com No Finding = 1(normal), No Finding = 0 (anormal)
-'''
 
 def encode_categoric_column(df: pd.DataFrame, c_name: str, data_dict):
     unique_labels = df[c_name].unique()
@@ -165,11 +114,20 @@ def filter_data_frame(df:pd.DataFrame, size=0.1):
     df = df.iloc[:final_size]
     return df
 
-
+'''
+    -1 --> inconclusivo
+    none --> dado faltante
+    
+    Especificação da coluna AP/PA
+        AP --> raio x entra pela frente e sai atrás
+        PA --> raio x entra por trás e sai na frente
+        
+        No Finding -> A coluna No Finding é um indicador de ausência de todas as outras patologias. Ela é derivada dos demais rótulos 
+            não tem valor clínico como informação extra a ser passada junto com a imagem.
+            Pode ser usada pra transformar o problema em classificação binária com No Finding = 1(normal), No Finding = 0 (anormal)
+'''
 def get_chexpert() -> dict:
     path = kagglehub.dataset_download("ashery/chexpert")
-    #path = 'C:\\Users\\matheus\\.cache\\kagglehub\\datasets\\ashery\\chexpert\\versions\\1'
-    #path = '/home/msmartin/.cache/kagglehub/datasets/ashery/chexpert/versions/1'
     
     data_dict = dict()
     
@@ -281,9 +239,7 @@ def get_data_chest_x_ray_image(img_size=(224, 224), split_ratio=0.8, kfold=None,
 
     idx_to_class = {v: k for k, v in base_train_dataset.class_to_idx.items()}
 
-    # -------------------------
-    # MODO NORMAL (sem K-Fold)
-    # -------------------------
+    ### modo normal, divide com random split
     if kfold is None:
         train_subset, val_subset = my_random_split(base_train_dataset, size=split_ratio)
         train_dataset = TransformDataset(train_subset, train_transform)
@@ -299,9 +255,7 @@ def get_data_chest_x_ray_image(img_size=(224, 224), split_ratio=0.8, kfold=None,
             'classes': base_train_dataset.classes
         }
 
-    # -------------------------
-    # MODO K-FOLD
-    # -------------------------
+    ## modo kfold, usa StratifiedKfold para a divisão dos índices e devolve em data_dict a lista de índices para cada fold
     else:
         targets = [y for _, y in base_train_dataset]  # labels para stratificação
         skf = StratifiedKFold(n_splits=kfold, shuffle=True, random_state=seed)

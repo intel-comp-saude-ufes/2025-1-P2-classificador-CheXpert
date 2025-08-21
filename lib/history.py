@@ -2,6 +2,10 @@ from collections import defaultdict
 import json
 
 class History:
+    '''
+    Classe utilizada para organizar e armazenar as informações de histórico de métricas durante o treinamento.
+    '''
+    
     def __init__(self):
         self.history = defaultdict(list)
 

@@ -6,6 +6,11 @@ from torchvision.models import densenet121, densenet161, DenseNet121_Weights, De
 from torchvision.models import vit_b_16, vit_b_32, ViT_B_16_Weights, ViT_B_32_Weights
 
 class FreezableCNN(nn.Module):
+    '''
+    Classe base utilizada para definir as funcionalidades de freeze e unfreeze das redes neurais pré-treinadas encontradas no torchvision
+    '''
+    
+    
     def __init__(self):
         super().__init__()
         self.feature_extractor = None

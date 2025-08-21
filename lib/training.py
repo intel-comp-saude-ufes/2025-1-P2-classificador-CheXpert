@@ -88,6 +88,10 @@ def construct_paths(save_path, save_name):
 
 
 def att_desc_tqdm_bar(tqdm_bar, epoch, train_loss, train_accuracy, val_loss, min_val_loss, val_accuracy, new_best=False):
+    '''
+    Função auxiliar para atualizar o tqdm de treinamento
+    '''
+    
     desc_str = (f"Epoch {epoch+1} | "
                 f"Train Loss: {train_loss:.4f} | "
                 f"Train Accuracy: {train_accuracy:.2f}% | "
@@ -186,7 +190,7 @@ def train(model: nn.Module, train_dataloader: Dataset, val_dataloader :Dataset, 
         should_stop = False
         new_best=False
         
-        ## integrar warmup dentro do earlystopping
+        ## integrar warmup dentro do earlystopping ?
         if epoch >= warmup:
                 should_stop = early_stopper.step(val_metrics)
                 new_best = early_stopper.is_best()
@@ -222,7 +226,7 @@ def train(model: nn.Module, train_dataloader: Dataset, val_dataloader :Dataset, 
         ## early stopping
         if should_stop: break
     
-    ## entered in the loop
+    ## did it get inside the loop?
     if last_epoch !=-1:   
         metadata = {
                     'min_val_loss' : min_val_loss_mean,

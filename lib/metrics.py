@@ -2,6 +2,10 @@ import torch
 import torchmetrics
 
 class MetricCollection:
+    '''
+    Classe criada para agregar diversas métricas do torchmetrics para facilitar no treinamento de modelos.
+    '''
+    
     def __init__(self, device):
         self.device = device
 

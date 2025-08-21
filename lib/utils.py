@@ -80,6 +80,9 @@ def show_batch(title: str, images, labels, label_map: dict, device=None, net=Non
     return
 
 def plot_evolution(y_values: list[list], y_labels, title='Evolution', xlabel='Iterations', ylabel='Values', path=None, vlines=None):
+    '''
+    Função geral que plota curvas de evolução.
+    '''
     import matplotlib.pyplot as plt
     import os
     import itertools
@@ -116,6 +119,9 @@ def plot_evolution(y_values: list[list], y_labels, title='Evolution', xlabel='It
 
 
 def plot_confusion_matrix(y_true, y_pred, class_map=None, save_path=None):
+    '''
+    Faz o plot da matriz de confusão.
+    '''
     import matplotlib.pyplot as plt
     from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
