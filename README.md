@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-O intuito desse trabalho é desenvolver um classificador de radiografias de tórax e analisar a sua capacidade de generalização em outra base. Os modelos foram treinandos primeiramente na base do kaggle *Chest X-ray Image* (<https://www.kaggle.com/datasets/alsaniipe/chest-x-ray-image>) e testados posteriormente na base do kaggle *CheXpert-v1.0-small* (<https://www.kaggle.com/datasets/ashery/chexpert>).
+O intuito desse trabalho é desenvolver um classificador de radiografias de tórax e analisar a sua capacidade de generalização em outra base. Os modelos foram treinados primeiramente na base do kaggle *Chest X-ray Image* (<https://www.kaggle.com/datasets/alsaniipe/chest-x-ray-image>) e testados posteriormente na base do kaggle *CheXpert-v1.0-small* (<https://www.kaggle.com/datasets/ashery/chexpert>).
 
 ## O que o repositório possui?
 
@@ -17,11 +17,10 @@ Lista das dependências necessárias para executar o projeto.
 
 * Arquivo de metadados para a geração de gráficos.
 
-
 ---
 # Estrutura do repositório
 Este projeto é estruturado para:
-1. Armazenar **dados brutos e tratados**.
+1. Armazenar **metadados** para geração de resultados.
 2. Executar **modelos e análises estatísticas** com scripts organizados.
 3. Produzir e armazenar **gráficos e resultados prontos para o artigo**.
 
