@@ -81,7 +81,7 @@ pip install -r requirements.txt
 
 Executar as células do notebook python `trab.ipynb`.
 
-3. Verifique o diretório `experiments/` para verificar o resultado dos experimentos. Além do diretório raiz onde serão salvos plots, tabelas latex e arquivos csv's.
+3. Verifique o diretório `experiments/` para encontrar o resultado dos experimentos. Além do diretório raiz onde serão salvos plots, tabelas latex e arquivos csv's.
 
 ---
 # Contato
