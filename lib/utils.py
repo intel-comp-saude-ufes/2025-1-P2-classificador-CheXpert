@@ -3,7 +3,7 @@ def get_device():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'    
     return torch.device(device=device)
 
-def show_batch(title: str, images, labels, label_map: dict, device=None, net=None, path=None, grad_cam=False, target_layer=None):
+def show_batch(title: str, images, true_labels_list, pred_label_map: dict, device=None, net=None, path=None, grad_cam=False, target_layer=None):
     '''
     Plota um batch. Se o modelo não for None, calcula as predições e plota junto. Se path não for None, salva a imagem em path como png. 
     Se grad_cam=True, então o método grad_cam é aplicado, para isso, target_layer tem que ser a última camada convolucional da rede.
@@ -62,19 +62,18 @@ def show_batch(title: str, images, labels, label_map: dict, device=None, net=Non
         ax.grid(False)
         ax.axis('off')
 
-        true_label_idx = labels[idx].item() if torch.is_tensor(labels[idx]) else labels[idx]
-        true_label = label_map[true_label_idx]
+        true_label = true_labels_list[idx]
         subtitle = f'True: {true_label}'
 
         if prd is not None:
-            pred_label = label_map[prd[idx]]
+            pred_label = pred_label_map[prd[idx]]
             subtitle += f'\nPrd: {pred_label}'
 
         ax.set_title(subtitle, fontsize=8)
 
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     if path:
-        plt.savefig(path, dpi=300)
+        plt.savefig(path, dpi=300, bbox_inches='tight')
     plt.show()
     
     return

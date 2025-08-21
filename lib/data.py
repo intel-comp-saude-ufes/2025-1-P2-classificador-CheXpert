@@ -54,7 +54,6 @@ class CheXpertDataSet(Dataset):
         dataset = self
         return DataLoader(dataset=dataset, batch_size=batch_size, shuffle=shuffle)
 
-
 def to_rgb_if_needed(x):
     if x.shape[0] == 1: ## Converte para RGB caso for gray scale
         return x.repeat(3, 1, 1)
