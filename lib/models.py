@@ -9,8 +9,6 @@ class FreezableCNN(nn.Module):
     '''
     Classe base utilizada para definir as funcionalidades de freeze e unfreeze das redes neurais pré-treinadas encontradas no torchvision
     '''
-    
-    
     def __init__(self):
         super().__init__()
         self.feature_extractor = None

@@ -13,6 +13,18 @@ from torchvision.io import read_image
 from torch.utils.data import Subset, random_split
 from sklearn.model_selection import StratifiedKFold
 
+
+########################################################################
+
+def get_path_chexpert():
+    return kagglehub.dataset_download("ashery/chexpert")
+
+def get_path_chestxray():
+    return kagglehub.dataset_download("alsaniipe/chest-x-ray-image")
+
+########################################################################
+
+
 class CheXpertDataSet(Dataset):
     def __init__(self, data_df, label_columns, path_column, transformation=None):
         self.label_columns = label_columns
@@ -126,15 +138,17 @@ def filter_data_frame(df:pd.DataFrame, size=0.1):
             não tem valor clínico como informação extra a ser passada junto com a imagem.
             Pode ser usada pra transformar o problema em classificação binária com No Finding = 1(normal), No Finding = 0 (anormal)
 '''
+
+
 def get_chexpert() -> dict:
-    path = kagglehub.dataset_download("ashery/chexpert")
-    
     data_dict = dict()
+    
+    PATH_CHEXPERT = get_path_chexpert()
     
     train_transformation, test_transformation = get_transformations()
     
-    train_csv_path = os.path.join(path, 'train.csv')
-    valid_csv_path = os.path.join(path, 'valid.csv')
+    train_csv_path = os.path.join(PATH_CHEXPERT, 'train.csv')
+    valid_csv_path = os.path.join(PATH_CHEXPERT, 'valid.csv')
     df_train = pd.read_csv(train_csv_path)    
     df_valid = pd.read_csv(valid_csv_path)
     
@@ -161,15 +175,15 @@ def get_chexpert() -> dict:
         df_train[c] = df_train[c].replace(data_dict[c]['label2id'])
 
     ## fixing paths 
-    df_train['Path'] = fix_df_path(df_train, path)
-    df_valid['Path'] = fix_df_path(df_valid, path)
+    df_train['Path'] = fix_df_path(df_train, PATH_CHEXPERT)
+    df_valid['Path'] = fix_df_path(df_valid, PATH_CHEXPERT)
     
     ## setting nan -> 0, and -1 -> 0, for all label_columns
     df_train = treat_df_label_columns(df_train, label_columns, inplace=True)
     df_valid = treat_df_label_columns(df_valid, label_columns, inplace=True)
     
     df_train = filter_data_frame(df_train, size=1.00) ## filtrando pra testar
-    print('lines:',df_train.shape[0])
+    #print('lines:',df_train.shape[0])
     
     df_train = df_train.reset_index(drop=True) # this is needed, do not remove this reset index lines (DataSet stores pandas Series, so they must have the correct indexes)
     df_valid = df_valid.reset_index(drop=True)
@@ -182,6 +196,9 @@ def get_chexpert() -> dict:
     data_dict['train_dataset'] = train_dataset
     data_dict['test_dataset'] = test_dataset
     data_dict['classes'] = label_columns
+    
+    data_dict['df_train'] = df_train
+    data_dict['df_valid'] = df_valid
     
     return data_dict
 
@@ -229,9 +246,10 @@ def get_data_chest_x_ray_image(img_size=(224, 224), split_ratio=0.8, kfold=None,
       - Modo K-Fold: retorna base_dataset, lista de folds e metadados
     """
     # Baixar dados
-    PATH = kagglehub.dataset_download("alsaniipe/chest-x-ray-image")    
-    train_path = os.path.join(PATH, 'Data/train')
-    test_path = os.path.join(PATH, 'Data/test')
+    PATH_CHESTXRAY = get_path_chestxray()
+    
+    train_path = os.path.join(PATH_CHESTXRAY, 'Data/train')
+    test_path = os.path.join(PATH_CHESTXRAY, 'Data/test')
 
     base_train_dataset = ImageFolder(root=train_path)
     train_transform, test_transform = get_transformations(img_size=img_size)

@@ -1,3 +1,0 @@
-1 - gráfico de mean e std dos modelos nos fols
-2 - testar todos os modelos treinados no outro dataset (chexpert)
-3 - ver se é facil treinar filtrar somente as classes normal e pneumonia
